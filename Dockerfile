@@ -5,7 +5,7 @@ RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm \
       nodejs npm \
       dotnet-sdk \
-      python-azure-cli \
+      azure-cli \
       git base-devel \
       neovim tmux lazygit \
       && pacman -Scc --noconfirm
