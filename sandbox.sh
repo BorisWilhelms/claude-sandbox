@@ -139,7 +139,6 @@ cmd_run() {
 
     # --- Assemble env vars ---
     ENV_VARS=""
-    ENV_VARS="$ENV_VARS -e HOST_UID=$(id -u) -e HOST_GID=$(id -g)"
     [ -n "$SSH_AUTH_SOCK" ] && \
         ENV_VARS="$ENV_VARS -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock"
     [ -n "$ANTHROPIC_API_KEY" ] && \
@@ -149,7 +148,8 @@ cmd_run() {
     fi
 
     # --- Run ---
-    RUN_CMD="$RUNTIME run -it --rm $MOUNTS $ENV_VARS $IMAGE_NAME"
+    # --userns=keep-id maps host UID/GID 1:1 into container (podman rootless)
+    RUN_CMD="$RUNTIME run -it --rm --userns=keep-id $MOUNTS $ENV_VARS $IMAGE_NAME"
 
     if [ -n "$CONTAINER_ID" ]; then
         exec distrobox-host-exec $RUN_CMD
