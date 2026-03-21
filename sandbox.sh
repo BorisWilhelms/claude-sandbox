@@ -73,7 +73,12 @@ cmd_run() {
     MOUNTS=""
     MOUNTS="$MOUNTS -v $HOST_PWD:/workspace"
     MOUNTS="$MOUNTS -v $HOST_HOME/.claude:/home/sandbox/.claude"
-    MOUNTS="$MOUNTS -v $HOST_HOME/.gitconfig:/home/sandbox/.gitconfig:ro"
+    # Git config: check XDG location first, then traditional
+    if [ -f "$HOST_HOME/.config/git/config" ]; then
+        MOUNTS="$MOUNTS -v $HOST_HOME/.config/git/config:/home/sandbox/.config/git/config:ro"
+    elif [ -f "$HOST_HOME/.gitconfig" ]; then
+        MOUNTS="$MOUNTS -v $HOST_HOME/.gitconfig:/home/sandbox/.gitconfig:ro"
+    fi
 
     # Optional mounts (only if source exists)
     [ -d "$HOST_HOME/.config/nvim" ] && \
