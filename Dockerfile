@@ -10,12 +10,10 @@ RUN pacman -Syu --noconfirm && \
       neovim tmux lazygit \
       && pacman -Scc --noconfirm
 
-# Install gosu from AUR (build as temp user, install, clean up)
-RUN useradd -m builder && \
-    echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder && \
-    su - builder -c "git clone https://aur.archlinux.org/gosu-bin.git /tmp/gosu-bin && cd /tmp/gosu-bin && makepkg -si --noconfirm" && \
-    userdel -r builder && \
-    rm /etc/sudoers.d/builder
+# Install gosu (direct binary download — AUR package no longer exists)
+RUN curl -fsSL "https://github.com/tianon/gosu/releases/download/1.17/gosu-amd64" -o /usr/local/bin/gosu && \
+    chmod +x /usr/local/bin/gosu && \
+    gosu --version
 
 # Install Claude Code
 RUN npm install -g @anthropic-ai/claude-code
