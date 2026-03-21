@@ -10,6 +10,7 @@ useradd -u "$HOST_UID" -g "$HOST_GID" -o -m -d /home/sandbox -s /bin/sh sandbox 
 
 # Ensure home directory structure exists for mounts
 mkdir -p /home/sandbox/.gnupg /home/sandbox/.config /home/sandbox/.local/share
+chmod 700 /home/sandbox/.gnupg
 chown "$HOST_UID:$HOST_GID" /home/sandbox /home/sandbox/.gnupg /home/sandbox/.config /home/sandbox/.local /home/sandbox/.local/share
 
 # Execute as sandbox user
