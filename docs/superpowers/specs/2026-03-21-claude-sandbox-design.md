@@ -2,7 +2,7 @@
 
 ## Goal
 
-Provide a containerized sandbox for running Claude Code with `--dangerously-skip-permissions`, isolating it from the host filesystem while keeping the developer workflow intact. Must work for colleagues using Docker directly and for Boris using distrobox (via `distrobox-host-exec`).
+Provide a containerized sandbox for running Claude Code with `--dangerously-skip-permissions`, isolating it from the host filesystem while keeping the developer workflow intact. Uses Docker (or Podman) as the container runtime. Must also work when invoked from inside a distrobox (via `distrobox-host-exec`).
 
 ## Primary Protection Target
 
@@ -53,7 +53,7 @@ tmux attach -t "$NAME" || tmux \
   attach
 ```
 
-### 2. Bind-Mounts (Docker mode)
+### 2. Bind-Mounts
 
 All container-side paths use the explicit home `/home/sandbox`.
 
@@ -73,14 +73,12 @@ All container-side paths use the explicit home `/home/sandbox`.
 - `SSH_AUTH_SOCK=/tmp/ssh-agent.sock` (remapped inside container)
 - `HOST_UID=$(id -u)` / `HOST_GID=$(id -g)` (for entrypoint user creation)
 
-**Additional environment variables for GPG (Docker mode only, if GPG socket mounted):**
+**Additional environment variables (if GPG socket mounted):**
 - `GPG_AGENT_INFO=/home/sandbox/.gnupg/S.gpg-agent`
 
 The `entrypoint.sh` creates `/home/sandbox/.gnupg/` before the socket mount becomes accessible.
 
-**Note on distrobox mode:** When using distrobox (option 2 in runtime detection) **without** `--home`, distrobox mounts the host home directory automatically and maps the host user. All configs (nvim, tmux, git, claude, GPG, SSH) are available via the shared home — the bind-mount table above does **not** apply. Only the project directory mount to `/workspace` is explicitly added. With `--home /home/sandbox`, distrobox does **not** auto-mount the host home, so the Docker-mode bind-mounts would be needed.
-
-**Recommendation:** Use distrobox **without** `--home` so that the host home is shared and no explicit config mounts are needed. The tradeoff is less isolation (distrobox can see all of `$HOME`), but this matches Boris's current distrobox workflow.
+**Security: no container runtime socket is mounted.** Docker/Podman sockets are never bind-mounted into the sandbox. Docker and Podman CLIs are not installed in the image. This prevents container escape via `docker run -v /:/host`.
 
 ### 3. `sandbox.sh` / `claude-sandbox`
 
@@ -92,19 +90,14 @@ claude-sandbox install      # copy script to ~/.local/bin/claude-sandbox
 claude-sandbox build        # explicitly (re)build the image
 ```
 
-**Runtime detection logic (in order):**
+**Runtime detection logic:**
 
 1. **Inside a distrobox?** (`CONTAINER_ID` env var is set)
    - Use `distrobox-host-exec docker run ...` to execute Docker on the host
    - All host paths are resolved before passing to `distrobox-host-exec`
-2. **distrobox available on host?**
-   - Use `distrobox create --image claude-sandbox:latest --name claude-sandbox` (no `--home` — host home is shared)
-   - Then `distrobox enter claude-sandbox -- bash -c 'cd /workspace && ccode'`
-   - Distrobox handles user mapping and home mounts automatically
-   - Container is **persistent** (survives restarts, `distrobox rm` to remove)
-3. **Docker available?**
-   - Use `docker run -it --rm` with bind-mounts from section 2
-   - Container is **ephemeral** (removed after exit)
+2. **Otherwise:** Use `docker run -it --rm` directly
+
+Container is always **ephemeral** (`--rm` — removed after exit).
 
 **Start sequence:**
 
@@ -115,8 +108,7 @@ claude-sandbox build        # explicitly (re)build the image
 
 ### 4. User/Permission Mapping
 
-- **Docker:** The `entrypoint.sh` script creates user `sandbox` with UID/GID matching `HOST_UID`/`HOST_GID` at container start. This ensures bind-mounted files have correct ownership. Uses `gosu` (installed in Dockerfile) to drop privileges.
-- **Distrobox:** Handles user mapping natively — host user is replicated inside the container.
+The `entrypoint.sh` script creates user `sandbox` with UID/GID matching `HOST_UID`/`HOST_GID` at container start. This ensures bind-mounted files have correct ownership. Uses `gosu` (installed in Dockerfile) to drop privileges.
 
 ### 5. Out of Scope (v1)
 
