@@ -7,6 +7,7 @@ RUN pacman -Syu --noconfirm && \
       dotnet-sdk \
       azure-cli \
       git base-devel \
+      bash \
       neovim tmux lazygit \
       && pacman -Scc --noconfirm
 

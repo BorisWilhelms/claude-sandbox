@@ -3,11 +3,11 @@ set -e
 
 IMAGE_NAME="claude-sandbox:latest"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONF_FILE="$SCRIPT_DIR/sandbox.conf"
 
 # --- Detect container runtime ---
 detect_runtime() {
     if [ -n "$CONTAINER_ID" ]; then
-        # Inside distrobox — check what's on the host
         if distrobox-host-exec sh -c "command -v docker" >/dev/null 2>&1; then
             echo "docker"
         elif distrobox-host-exec sh -c "command -v podman" >/dev/null 2>&1; then
@@ -33,7 +33,6 @@ RUNTIME="$(detect_runtime)"
 # --- Subcommands ---
 
 cmd_install() {
-    # Bake the repo path into the installed copy so builds work from anywhere
     REPO_DIR="$SCRIPT_DIR"
     sed "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"$REPO_DIR\"|" "$0" > "$HOME/.local/bin/claude-sandbox"
     chmod +x "$HOME/.local/bin/claude-sandbox"
@@ -57,36 +56,72 @@ image_exists() {
     fi
 }
 
+# --- Parse config file into mounts ---
+parse_mounts() {
+    HOST_HOME="$HOME"
+
+    if [ ! -f "$CONF_FILE" ]; then
+        echo "WARNING: No sandbox.conf found at $CONF_FILE" >&2
+        return
+    fi
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Skip comments and empty lines
+        case "$line" in
+            \#*|"") continue ;;
+        esac
+
+        # Parse fields: host_path [container_path] [rw]
+        host_path=""
+        container_path=""
+        mode="ro"
+
+        # Check if last field is "rw"
+        last_field=$(echo "$line" | awk '{print $NF}')
+        if [ "$last_field" = "rw" ]; then
+            mode="rw"
+            # Remove trailing "rw"
+            line=$(echo "$line" | sed 's/ *rw$//')
+        fi
+
+        host_path=$(echo "$line" | awk '{print $1}')
+        container_path=$(echo "$line" | awk '{print $2}')
+
+        # Expand ~ to $HOME
+        host_path=$(echo "$host_path" | sed "s|^~|$HOST_HOME|")
+
+        # Skip if source doesn't exist
+        if [ ! -e "$host_path" ]; then
+            continue
+        fi
+
+        # Default container path: mirror under /home/sandbox/
+        if [ -z "$container_path" ]; then
+            # Strip $HOME prefix, prepend /home/sandbox
+            rel_path=$(echo "$host_path" | sed "s|^$HOST_HOME/||")
+            container_path="/home/sandbox/$rel_path"
+        else
+            container_path=$(echo "$container_path" | sed "s|^~|/home/sandbox|")
+        fi
+
+        MOUNTS="$MOUNTS -v $host_path:$container_path:$mode"
+    done < "$CONF_FILE"
+}
+
 cmd_run() {
-    # Build if image doesn't exist
     if ! image_exists; then
         cmd_build
     fi
 
-    # --- Resolve host paths ---
-    # When running inside distrobox, ~ points to the host home (distrobox shares it).
-    # We need the real host paths for docker bind-mounts.
     HOST_HOME="$HOME"
     HOST_PWD="$(pwd)"
 
     # --- Assemble mounts ---
     MOUNTS=""
     MOUNTS="$MOUNTS -v $HOST_PWD:/workspace"
-    MOUNTS="$MOUNTS -v $HOST_HOME/.claude:/home/sandbox/.claude"
-    # Git config: check XDG location first, then traditional
-    if [ -f "$HOST_HOME/.config/git/config" ]; then
-        MOUNTS="$MOUNTS -v $HOST_HOME/.config/git/config:/home/sandbox/.config/git/config:ro"
-    elif [ -f "$HOST_HOME/.gitconfig" ]; then
-        MOUNTS="$MOUNTS -v $HOST_HOME/.gitconfig:/home/sandbox/.gitconfig:ro"
-    fi
 
-    # Optional mounts (only if source exists)
-    [ -d "$HOST_HOME/.config/nvim" ] && \
-        MOUNTS="$MOUNTS -v $HOST_HOME/.config/nvim:/home/sandbox/.config/nvim:ro"
-    [ -f "$HOST_HOME/.tmux.conf" ] && \
-        MOUNTS="$MOUNTS -v $HOST_HOME/.tmux.conf:/home/sandbox/.tmux.conf:ro"
-    [ -d "$HOST_HOME/.local/share/nvim" ] && \
-        MOUNTS="$MOUNTS -v $HOST_HOME/.local/share/nvim:/home/sandbox/.local/share/nvim"
+    # Mounts from config file
+    parse_mounts
 
     # SSH agent
     if [ -n "$SSH_AUTH_SOCK" ]; then
