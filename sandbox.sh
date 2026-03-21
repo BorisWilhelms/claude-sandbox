@@ -4,6 +4,32 @@ set -e
 IMAGE_NAME="claude-sandbox:latest"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# --- Detect container runtime ---
+detect_runtime() {
+    if [ -n "$CONTAINER_ID" ]; then
+        # Inside distrobox — check what's on the host
+        if distrobox-host-exec sh -c "command -v docker" >/dev/null 2>&1; then
+            echo "docker"
+        elif distrobox-host-exec sh -c "command -v podman" >/dev/null 2>&1; then
+            echo "podman"
+        else
+            echo "ERROR: Neither docker nor podman found on host" >&2
+            exit 1
+        fi
+    else
+        if command -v docker >/dev/null 2>&1; then
+            echo "docker"
+        elif command -v podman >/dev/null 2>&1; then
+            echo "podman"
+        else
+            echo "ERROR: Neither docker nor podman found" >&2
+            exit 1
+        fi
+    fi
+}
+
+RUNTIME="$(detect_runtime)"
+
 # --- Subcommands ---
 
 cmd_install() {
@@ -17,17 +43,17 @@ cmd_install() {
 cmd_build() {
     echo "Building $IMAGE_NAME..."
     if [ -n "$CONTAINER_ID" ]; then
-        distrobox-host-exec docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
+        distrobox-host-exec $RUNTIME build -t "$IMAGE_NAME" "$SCRIPT_DIR"
     else
-        docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
+        $RUNTIME build -t "$IMAGE_NAME" "$SCRIPT_DIR"
     fi
 }
 
 image_exists() {
     if [ -n "$CONTAINER_ID" ]; then
-        distrobox-host-exec docker image inspect "$IMAGE_NAME" >/dev/null 2>&1
+        distrobox-host-exec $RUNTIME image inspect "$IMAGE_NAME" >/dev/null 2>&1
     else
-        docker image inspect "$IMAGE_NAME" >/dev/null 2>&1
+        $RUNTIME image inspect "$IMAGE_NAME" >/dev/null 2>&1
     fi
 }
 
@@ -83,12 +109,12 @@ cmd_run() {
     fi
 
     # --- Run ---
-    DOCKER_CMD="docker run -it --rm $MOUNTS $ENV_VARS $IMAGE_NAME"
+    RUN_CMD="$RUNTIME run -it --rm $MOUNTS $ENV_VARS $IMAGE_NAME"
 
     if [ -n "$CONTAINER_ID" ]; then
-        exec distrobox-host-exec $DOCKER_CMD
+        exec distrobox-host-exec $RUN_CMD
     else
-        exec $DOCKER_CMD
+        exec $RUN_CMD
     fi
 }
 
