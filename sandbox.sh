@@ -3,7 +3,7 @@ set -e
 
 IMAGE_NAME="claude-sandbox:latest"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONF_FILE="$SCRIPT_DIR/sandbox.conf"
+CONF_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/claude-sandbox/sandbox.conf"
 
 # --- Detect container runtime ---
 detect_runtime() {
@@ -33,10 +33,14 @@ RUNTIME="$(detect_runtime)"
 # --- Subcommands ---
 
 cmd_install() {
-    REPO_DIR="$SCRIPT_DIR"
-    sed "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"$REPO_DIR\"|" "$0" > "$HOME/.local/bin/claude-sandbox"
+    DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/claude-sandbox"
+    mkdir -p "$DATA_DIR/scripts"
+    cp "$SCRIPT_DIR/Dockerfile" "$DATA_DIR/"
+    cp "$SCRIPT_DIR/scripts/entrypoint.sh" "$DATA_DIR/scripts/"
+    cp "$SCRIPT_DIR/scripts/ccode" "$DATA_DIR/scripts/"
+    sed "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"$DATA_DIR\"|" "$0" > "$HOME/.local/bin/claude-sandbox"
     chmod +x "$HOME/.local/bin/claude-sandbox"
-    echo "Installed to ~/.local/bin/claude-sandbox (build context: $REPO_DIR)"
+    echo "Installed to ~/.local/bin/claude-sandbox (data: $DATA_DIR)"
 }
 
 cmd_build() {
@@ -118,7 +122,7 @@ cmd_run() {
 
     # --- Assemble mounts ---
     MOUNTS=""
-    MOUNTS="$MOUNTS -v $HOST_PWD:/workspace"
+    MOUNTS="$MOUNTS -v $HOST_PWD:$HOST_PWD"
 
     # Mounts from config file
     parse_mounts
@@ -138,7 +142,7 @@ cmd_run() {
     fi
 
     # --- Assemble env vars ---
-    ENV_VARS=""
+    ENV_VARS="-e TERM=xterm-256color -e SANDBOX=1"
     [ -n "$SSH_AUTH_SOCK" ] && \
         ENV_VARS="$ENV_VARS -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock"
     [ -n "$ANTHROPIC_API_KEY" ] && \
@@ -150,7 +154,7 @@ cmd_run() {
     # --- Run ---
     # --userns=keep-id maps host UID/GID 1:1 into container (podman rootless)
     # --security-opt label=disable disables SELinux label enforcement for bind-mounts
-    RUN_CMD="$RUNTIME run -it --rm --userns=keep-id --security-opt label=disable $MOUNTS $ENV_VARS $IMAGE_NAME"
+    RUN_CMD="$RUNTIME run -it --rm --userns=keep-id --security-opt label=disable -w $HOST_PWD $MOUNTS $ENV_VARS $IMAGE_NAME ${CONTAINER_CMD:-}"
 
     if [ -n "$CONTAINER_ID" ]; then
         exec distrobox-host-exec $RUN_CMD
@@ -164,5 +168,6 @@ cmd_run() {
 case "${1:-}" in
     install) cmd_install ;;
     build)   cmd_build ;;
+    shell)   CONTAINER_CMD="bash" ; cmd_run ;;
     *)       cmd_run ;;
 esac

@@ -9,7 +9,7 @@ tmux attach -t "$NAME" || tmux \
   split-window -v \; \
   resize-pane -y 25% \; \
   select-pane -t 0 \; \
-  new-window -n "claude" "claude --dangerously-skip-permissions" \; \
+  new-window -n "claude" "$HOME/.local/bin/claude --dangerously-skip-permissions" \; \
   new-window -n "lazygit" lazygit \; \
   select-window -t 1 \; \
   attach

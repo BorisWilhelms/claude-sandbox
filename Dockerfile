@@ -4,15 +4,24 @@ FROM archlinux:latest
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm \
       nodejs npm \
-      dotnet-sdk \
-      azure-cli \
+      azure-cli icu \
       git base-devel \
       bash \
+      jq wget openssh ripgrep \
       neovim tmux lazygit \
       && pacman -Scc --noconfirm
 
-# Install Claude Code
-RUN npm install -g @anthropic-ai/claude-code
+# Install .NET SDKs
+ENV DOTNET_ROOT=/usr/share/dotnet
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
+    chmod +x /tmp/dotnet-install.sh && \
+    /tmp/dotnet-install.sh --channel 8.0 --install-dir $DOTNET_ROOT && \
+    /tmp/dotnet-install.sh --channel LTS --install-dir $DOTNET_ROOT --skip-non-versioned-files && \
+    rm /tmp/dotnet-install.sh
+ENV PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
+
+# Generate locales
+RUN sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
 
 # Create sandbox user (UID 1000 — remapped at runtime via --userns=keep-id)
 RUN useradd -m -d /home/sandbox -s /bin/bash -u 1000 sandbox
@@ -21,8 +30,20 @@ RUN useradd -m -d /home/sandbox -s /bin/bash -u 1000 sandbox
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY scripts/ccode /usr/local/bin/ccode
 
+# Pre-create XDG directories owned by sandbox so bind-mount intermediates
+# don't end up root-owned
+RUN mkdir -p /home/sandbox/.local/share \
+             /home/sandbox/.local/state \
+             /home/sandbox/.cache \
+             /home/sandbox/.config \
+             /home/sandbox/.gnupg && \
+    touch /home/sandbox/.sandbox && \
+    chown -R sandbox:sandbox /home/sandbox
+
 USER sandbox
-WORKDIR /workspace
+
+# Install Claude Code (as sandbox user, installs to ~/.local/bin/claude)
+RUN curl -fsSL https://claude.ai/install.sh | bash
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["ccode"]
