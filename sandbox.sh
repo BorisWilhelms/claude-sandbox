@@ -141,8 +141,19 @@ cmd_run() {
         MOUNTS="$MOUNTS -v $GPG_SOCK:/home/sandbox/.gnupg/S.gpg-agent"
     fi
 
+    # Wayland (for clipboard access)
+    if [ -n "$WAYLAND_DISPLAY" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
+        WAYLAND_SOCK="$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+        if [ -S "$WAYLAND_SOCK" ]; then
+            MOUNTS="$MOUNTS -v $WAYLAND_SOCK:/tmp/wayland-0"
+        fi
+    fi
+
     # --- Assemble env vars ---
     ENV_VARS="-e TERM=xterm-256color -e SANDBOX=1"
+    if [ -n "$WAYLAND_DISPLAY" ] && [ -S "${XDG_RUNTIME_DIR:-}/$WAYLAND_DISPLAY" ]; then
+        ENV_VARS="$ENV_VARS -e WAYLAND_DISPLAY=wayland-0 -e XDG_RUNTIME_DIR=/tmp"
+    fi
     [ -n "$SSH_AUTH_SOCK" ] && \
         ENV_VARS="$ENV_VARS -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock"
     [ -n "$ANTHROPIC_API_KEY" ] && \
@@ -154,7 +165,7 @@ cmd_run() {
     # --- Run ---
     # --userns=keep-id maps host UID/GID 1:1 into container (podman rootless)
     # --security-opt label=disable disables SELinux label enforcement for bind-mounts
-    RUN_CMD="$RUNTIME run -it --rm --userns=keep-id --security-opt label=disable -w $HOST_PWD $MOUNTS $ENV_VARS $IMAGE_NAME ${CONTAINER_CMD:-}"
+    RUN_CMD="$RUNTIME run -it --rm --userns=keep-id --security-opt label=disable --network=host -w $HOST_PWD $MOUNTS $ENV_VARS $IMAGE_NAME ${CONTAINER_CMD:-}"
 
     if [ -n "$CONTAINER_ID" ]; then
         exec distrobox-host-exec $RUN_CMD

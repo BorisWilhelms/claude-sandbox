@@ -7,18 +7,9 @@ RUN pacman -Syu --noconfirm && \
       azure-cli icu \
       git base-devel \
       bash \
-      jq wget openssh ripgrep \
+      jq wget openssh ripgrep wl-clipboard \
       neovim tmux lazygit \
       && pacman -Scc --noconfirm
-
-# Install .NET SDKs
-ENV DOTNET_ROOT=/usr/share/dotnet
-RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
-    chmod +x /tmp/dotnet-install.sh && \
-    /tmp/dotnet-install.sh --channel 8.0 --install-dir $DOTNET_ROOT && \
-    /tmp/dotnet-install.sh --channel LTS --install-dir $DOTNET_ROOT --skip-non-versioned-files && \
-    rm /tmp/dotnet-install.sh
-ENV PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
 
 # Generate locales
 RUN sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
@@ -42,7 +33,14 @@ RUN mkdir -p /home/sandbox/.local/share \
 
 USER sandbox
 
-# Install Claude Code (as sandbox user, installs to ~/.local/bin/claude)
+# Install .NET SDKs (default install-dir: ~/.dotnet)
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
+    chmod +x /tmp/dotnet-install.sh && \
+    /tmp/dotnet-install.sh --channel 8.0 && \
+    /tmp/dotnet-install.sh --channel LTS --skip-non-versioned-files && \
+    rm /tmp/dotnet-install.sh
+
+# Install Claude Code (installs to ~/.local/bin/claude)
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
