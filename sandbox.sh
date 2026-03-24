@@ -40,28 +40,32 @@ cmd_install() {
     sed "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"$DATA_DIR\"|" "$0" > "$HOME/.local/bin/claude-sandbox"
     chmod +x "$HOME/.local/bin/claude-sandbox"
 
-    # Install sandbox guard hook
+    # Install sandbox hooks
     mkdir -p "$HOME/.claude/hooks"
     cp "$SCRIPT_DIR/hooks/sandbox-guard.sh" "$HOME/.claude/hooks/sandbox-guard.sh"
-    chmod +x "$HOME/.claude/hooks/sandbox-guard.sh"
+    cp "$SCRIPT_DIR/hooks/sandbox-protect-hooks.sh" "$HOME/.claude/hooks/sandbox-protect-hooks.sh"
+    chmod +x "$HOME/.claude/hooks/sandbox-guard.sh" "$HOME/.claude/hooks/sandbox-protect-hooks.sh"
 
-    # Register hook in settings.json if not already present
+    # Register hooks in settings.json if not already present
     SETTINGS="$HOME/.claude/settings.json"
     if [ -f "$SETTINGS" ]; then
         if ! grep -q "sandbox-guard" "$SETTINGS"; then
-            echo "NOTE: Add the following to \"hooks\" in $SETTINGS:"
+            echo "NOTE: Add the following to \"hooks.PreToolUse\" in $SETTINGS:"
             echo ""
-            echo '  "PreToolUse": ['
-            echo '    {'
-            echo '      "matcher": "Bash",'
-            echo '      "hooks": ['
-            echo '        {'
-            echo '          "type": "command",'
-            echo '          "command": "~/.claude/hooks/sandbox-guard.sh"'
-            echo '        }'
-            echo '      ]'
-            echo '    }'
-            echo '  ]'
+            echo '  {'
+            echo '    "matcher": "Bash",'
+            echo '    "hooks": [{'
+            echo '      "type": "command",'
+            echo '      "command": "~/.claude/hooks/sandbox-guard.sh"'
+            echo '    }]'
+            echo '  },'
+            echo '  {'
+            echo '    "matcher": "Edit|Write",'
+            echo '    "hooks": [{'
+            echo '      "type": "command",'
+            echo '      "command": "~/.claude/hooks/sandbox-protect-hooks.sh"'
+            echo '    }]'
+            echo '  }'
         fi
     else
         cat > "$SETTINGS" << 'SETTINGS_EOF'
@@ -74,6 +78,15 @@ cmd_install() {
           {
             "type": "command",
             "command": "~/.claude/hooks/sandbox-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/sandbox-protect-hooks.sh"
           }
         ]
       }
