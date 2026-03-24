@@ -155,8 +155,6 @@ cmd_run() {
     fi
     [ -n "$SSH_AUTH_SOCK" ] && \
         ENV_VARS="$ENV_VARS -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock"
-    [ -n "$ANTHROPIC_API_KEY" ] && \
-        ENV_VARS="$ENV_VARS -e ANTHROPIC_API_KEY"
     if [ -n "$GPG_SOCK" ] && [ -S "$GPG_SOCK" ]; then
         ENV_VARS="$ENV_VARS -e GPG_AGENT_INFO=/home/sandbox/.gnupg/S.gpg-agent"
     fi
