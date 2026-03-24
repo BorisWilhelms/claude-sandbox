@@ -37,7 +37,6 @@ cmd_install() {
     mkdir -p "$DATA_DIR/scripts"
     cp "$SCRIPT_DIR/Dockerfile" "$DATA_DIR/"
     cp "$SCRIPT_DIR/scripts/entrypoint.sh" "$DATA_DIR/scripts/"
-    cp "$SCRIPT_DIR/scripts/ccode" "$DATA_DIR/scripts/"
     sed "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"$DATA_DIR\"|" "$0" > "$HOME/.local/bin/claude-sandbox"
     chmod +x "$HOME/.local/bin/claude-sandbox"
     echo "Installed to ~/.local/bin/claude-sandbox (data: $DATA_DIR)"
@@ -165,7 +164,7 @@ cmd_run() {
     # --- Run ---
     # --userns=keep-id maps host UID/GID 1:1 into container (podman rootless)
     # --security-opt label=disable disables SELinux label enforcement for bind-mounts
-    RUN_CMD="$RUNTIME run -it --rm --userns=keep-id --security-opt label=disable --network=host -w $HOST_PWD $MOUNTS $ENV_VARS $IMAGE_NAME ${CONTAINER_CMD:-}"
+    RUN_CMD="$RUNTIME run -it --rm --userns=keep-id --security-opt label=disable -w $HOST_PWD $MOUNTS $ENV_VARS $IMAGE_NAME ${CONTAINER_CMD:-}"
 
     if [ -n "$CONTAINER_ID" ]; then
         exec distrobox-host-exec $RUN_CMD

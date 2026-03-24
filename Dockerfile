@@ -8,7 +8,6 @@ RUN pacman -Syu --noconfirm && \
       git base-devel \
       bash \
       jq wget openssh ripgrep wl-clipboard \
-      neovim tmux lazygit \
       && pacman -Scc --noconfirm
 
 # Generate locales
@@ -19,7 +18,6 @@ RUN useradd -m -d /home/sandbox -s /bin/bash -u 1000 sandbox
 
 # Copy scripts
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY scripts/ccode /usr/local/bin/ccode
 
 # Pre-create XDG directories owned by sandbox so bind-mount intermediates
 # don't end up root-owned
@@ -44,4 +42,4 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh &&
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["ccode"]
+CMD ["/home/sandbox/.local/bin/claude", "--dangerously-skip-permissions"]
