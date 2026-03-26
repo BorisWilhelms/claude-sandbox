@@ -45,8 +45,15 @@ cmd_install() {
     mkdir -p "$DATA_DIR/scripts"
     cp "$SCRIPT_DIR/Dockerfile" "$DATA_DIR/"
     cp "$SCRIPT_DIR/scripts/entrypoint.sh" "$DATA_DIR/scripts/"
-    sed "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"$DATA_DIR\"|" "$0" > "$HOME/.local/bin/claude-sandbox"
-    chmod +x "$HOME/.local/bin/claude-sandbox"
+
+    # Determine install bin directory
+    BIN_DIR="$HOME/.local/bin"
+    if [ -d /opt/homebrew/bin ]; then
+        BIN_DIR="/opt/homebrew/bin"
+    fi
+    mkdir -p "$BIN_DIR"
+    sed "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"$DATA_DIR\"|" "$0" > "$BIN_DIR/claude-sandbox"
+    chmod +x "$BIN_DIR/claude-sandbox"
 
     # Install sandbox hooks
     mkdir -p "$HOME/.claude/hooks"
@@ -104,7 +111,7 @@ cmd_install() {
 SETTINGS_EOF
     fi
 
-    echo "Installed to ~/.local/bin/claude-sandbox (data: $DATA_DIR)"
+    echo "Installed to $BIN_DIR/claude-sandbox (data: $DATA_DIR)"
 }
 
 cmd_build() {
