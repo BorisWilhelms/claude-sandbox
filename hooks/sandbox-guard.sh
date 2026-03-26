@@ -63,12 +63,12 @@ fi
 
 # Allowlist for az commands
 if echo "$COMMAND" | grep -qE '^\s*az\s'; then
-    if ! echo "$COMMAND" | grep -qE 'az\s+(monitor|devops|boards|repos|pipelines)'; then
+    if ! echo "$COMMAND" | grep -qE 'az\s+(monitor|devops|boards|repos|pipelines|vm\s+show)'; then
         jq -n '{
             hookSpecificOutput: {
                 hookEventName: "PreToolUse",
                 permissionDecision: "deny",
-                permissionDecisionReason: "az command blocked by sandbox policy. Only az monitor, devops, boards, repos, and pipelines are allowed."
+                permissionDecisionReason: "az command blocked by sandbox policy. Only az monitor, devops, boards, repos, pipelines, and vm show are allowed."
             }
         }'
         exit 0

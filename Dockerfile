@@ -42,4 +42,4 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh &&
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["/home/sandbox/.local/bin/claude", "--dangerously-skip-permissions"]
+CMD ["claude", "--dangerously-skip-permissions"]

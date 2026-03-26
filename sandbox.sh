@@ -30,6 +30,14 @@ detect_runtime() {
 
 RUNTIME="$(detect_runtime)"
 
+# --- Platform flags ---
+# archlinux:latest is x86_64-only, needs explicit platform on ARM
+PLATFORM_FLAG=""
+ARCH="$(uname -m)"
+if [ "$ARCH" != "x86_64" ] && [ "$ARCH" != "amd64" ]; then
+    PLATFORM_FLAG="--platform linux/amd64"
+fi
+
 # --- Subcommands ---
 
 cmd_install() {
@@ -102,9 +110,9 @@ SETTINGS_EOF
 cmd_build() {
     echo "Building $IMAGE_NAME..."
     if [ -n "$CONTAINER_ID" ]; then
-        distrobox-host-exec $RUNTIME build -t "$IMAGE_NAME" "$SCRIPT_DIR"
+        distrobox-host-exec $RUNTIME build $PLATFORM_FLAG -t "$IMAGE_NAME" "$SCRIPT_DIR"
     else
-        $RUNTIME build -t "$IMAGE_NAME" "$SCRIPT_DIR"
+        $RUNTIME build $PLATFORM_FLAG -t "$IMAGE_NAME" "$SCRIPT_DIR"
     fi
 }
 
@@ -216,10 +224,16 @@ cmd_run() {
         ENV_VARS="$ENV_VARS -e GPG_AGENT_INFO=/home/sandbox/.gnupg/S.gpg-agent"
     fi
 
+    # --- Runtime-specific flags ---
+    RUNTIME_FLAGS=""
+    if [ "$RUNTIME" = "podman" ]; then
+        # --userns=keep-id maps host UID/GID 1:1 into container (podman rootless)
+        # --security-opt label=disable disables SELinux label enforcement for bind-mounts
+        RUNTIME_FLAGS="--userns=keep-id --security-opt label=disable"
+    fi
+
     # --- Run ---
-    # --userns=keep-id maps host UID/GID 1:1 into container (podman rootless)
-    # --security-opt label=disable disables SELinux label enforcement for bind-mounts
-    RUN_CMD="$RUNTIME run -it --rm --userns=keep-id --security-opt label=disable -w $HOST_PWD $MOUNTS $ENV_VARS $IMAGE_NAME ${CONTAINER_CMD:-}"
+    RUN_CMD="$RUNTIME run -it --rm $PLATFORM_FLAG $RUNTIME_FLAGS -w $HOST_PWD $MOUNTS $ENV_VARS $IMAGE_NAME ${CONTAINER_CMD:-}"
 
     if [ -n "$CONTAINER_ID" ]; then
         exec distrobox-host-exec $RUN_CMD
