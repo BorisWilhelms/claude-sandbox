@@ -4,10 +4,15 @@ FROM archlinux:latest
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm \
       nodejs npm \
+      go \
       azure-cli icu \
       git base-devel \
       bash \
       jq wget openssh ripgrep wl-clipboard \
+      # Playwright/Chromium browser dependencies
+      nss nspr alsa-lib at-spi2-core cups libdrm libxkbcommon \
+      mesa libxcomposite libxdamage libxrandr pango cairo \
+      libx11 libxcb libxext libxfixes glib2 dbus expat \
       && pacman -Scc --noconfirm
 
 # Generate locales
@@ -37,6 +42,13 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh &&
     /tmp/dotnet-install.sh --channel 8.0 && \
     /tmp/dotnet-install.sh --channel LTS --skip-non-versioned-files && \
     rm /tmp/dotnet-install.sh
+
+# Install Playwright CLI and browsers
+ENV NPM_CONFIG_PREFIX="/home/sandbox/.npm-global"
+ENV PATH="/home/sandbox/.npm-global/bin:$PATH"
+
+RUN npm install -g playwright && \
+    npx playwright install chromium
 
 # Install Claude Code (installs to ~/.local/bin/claude)
 RUN curl -fsSL https://claude.ai/install.sh | bash
